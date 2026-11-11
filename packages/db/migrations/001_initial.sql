@@ -758,6 +758,7 @@ CREATE TABLE session_sync_intents (
     CONSTRAINT chk_session_sync_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'leased'::character varying, 'acknowledged'::character varying, 'diverged'::character varying])::text[])))
 );
 
+-- @catamorphic-product-begin work
 CREATE TABLE stock_project_access_requests (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     project_id uuid NOT NULL,
@@ -793,6 +794,7 @@ CREATE TABLE stock_project_invitations (
     redeemed_by_external_user_id text,
     redeemed_at timestamp with time zone
 );
+-- @catamorphic-product-end
 
 CREATE TABLE store_document_versions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -1219,6 +1221,7 @@ ALTER TABLE ONLY session_mailbox_items
 ALTER TABLE ONLY session_sync_intents
     ADD CONSTRAINT session_sync_intents_pkey PRIMARY KEY (id);
 
+-- @catamorphic-product-begin work
 ALTER TABLE ONLY stock_project_access_requests
     ADD CONSTRAINT stock_project_access_requests_pkey PRIMARY KEY (id);
 
@@ -1227,6 +1230,7 @@ ALTER TABLE ONLY stock_project_admission_policies
 
 ALTER TABLE ONLY stock_project_invitations
     ADD CONSTRAINT stock_project_invitations_pkey PRIMARY KEY (id);
+-- @catamorphic-product-end
 
 ALTER TABLE ONLY store_document_versions
     ADD CONSTRAINT store_document_versions_document_id_version_key UNIQUE (document_id, version);
@@ -1456,9 +1460,11 @@ CREATE INDEX idx_session_mailbox_destination ON session_mailbox_items USING btre
 
 CREATE INDEX idx_session_sync_claim ON session_sync_intents USING btree (status, next_attempt_at, lease_expires_at);
 
+-- @catamorphic-product-begin work
 CREATE INDEX idx_stock_project_access_requests_project_status ON stock_project_access_requests USING btree (project_id, status, requested_at DESC);
 
 CREATE INDEX idx_stock_project_invitations_project ON stock_project_invitations USING btree (project_id, created_at DESC);
+-- @catamorphic-product-end
 
 CREATE INDEX idx_trigger_bindings_environment ON trigger_bindings USING btree (project_id, environment_name) WHERE (environment_name IS NOT NULL);
 
@@ -1520,7 +1526,9 @@ CREATE UNIQUE INDEX uq_session_mailbox_idempotency ON session_mailbox_items USIN
 
 CREATE UNIQUE INDEX uq_session_mailbox_message ON session_mailbox_items USING btree (session_id, message_id);
 
+-- @catamorphic-product-begin work
 CREATE UNIQUE INDEX uq_stock_project_access_requests_pending ON stock_project_access_requests USING btree (project_id, external_user_id) WHERE (status = 'pending'::text);
+-- @catamorphic-product-end
 
 CREATE UNIQUE INDEX uq_workflow_pauses_open_signal ON workflow_pauses USING btree (run_id, signal_name) WHERE ((signal_name IS NOT NULL) AND ((status)::text = 'open'::text));
 
@@ -1771,6 +1779,7 @@ ALTER TABLE ONLY session_sync_intents
 ALTER TABLE ONLY session_sync_intents
     ADD CONSTRAINT session_sync_intents_session_id_fkey FOREIGN KEY (session_id) REFERENCES agent_sessions(id) ON DELETE CASCADE;
 
+-- @catamorphic-product-begin work
 ALTER TABLE ONLY stock_project_access_requests
     ADD CONSTRAINT stock_project_access_requests_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
@@ -1779,6 +1788,7 @@ ALTER TABLE ONLY stock_project_admission_policies
 
 ALTER TABLE ONLY stock_project_invitations
     ADD CONSTRAINT stock_project_invitations_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+-- @catamorphic-product-end
 
 ALTER TABLE ONLY store_document_versions
     ADD CONSTRAINT store_document_versions_document_id_fkey FOREIGN KEY (document_id) REFERENCES store_documents(id) ON DELETE CASCADE;

@@ -10,6 +10,13 @@ import {
 } from "./config.js";
 import { createDatabase } from "./database.js";
 import { getMigrationsDir } from "./migrations-dir.js";
+import {
+  DEFAULT_SCHEMA_PRODUCT,
+  resolveSchemaProduct,
+  type SchemaProduct,
+  shouldApplyMigrationFile,
+  sqlForSchemaProduct,
+} from "./schema-product.js";
 import { splitSqlStatements } from "./split-sql.js";
 
 const MIGRATION_LOCK_KEY = "catamorphic:migrate";
@@ -23,6 +30,11 @@ export interface MigrateToLatestOptions<T> {
   db: Kysely<T>;
   /** Target schema. Created if missing. Defaults to `catamorphic`. */
   schema?: string;
+  /**
+   * Which product tables to create. `"core"` omits Work (`work_*`) tables
+   * (ADR 0310). Default `"all"` keeps the full schema.
+   */
+  product?: SchemaProduct;
   /** Called once per applied migration. Defaults to silent. */
   onApplied?: (name: string) => void;
 }
@@ -41,6 +53,7 @@ export interface MigrateToLatestResult {
 export async function migrateToLatest<T>({
   db,
   schema = DEFAULT_SCHEMA,
+  product = DEFAULT_SCHEMA_PRODUCT,
   onApplied,
 }: MigrateToLatestOptions<T>): Promise<MigrateToLatestResult> {
   const quotedSchema = quoteIdentifier(schema);
@@ -78,10 +91,12 @@ export async function migrateToLatest<T>({
     for (const file of files) {
       if (appliedSet.has(file)) continue;
       const content = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+      if (!shouldApplyMigrationFile(content, product)) continue;
+      const sqlText = sqlForSchemaProduct(content, product);
       await sql.raw(`SET LOCAL search_path TO ${quotedSchema}`).execute(trx);
       // Statement-by-statement so single-connection dialects (PGlite) that
       // reject multi-command strings can run migrations too.
-      for (const statement of splitSqlStatements(content)) {
+      for (const statement of splitSqlStatements(sqlText)) {
         await sql.raw(statement).execute(trx);
       }
       await sql`
@@ -98,11 +113,13 @@ export async function migrateToLatest<T>({
 export async function runMigrate() {
   const connectionString = resolveDatabaseUrl();
   const schema = resolveSchema();
+  const product = resolveSchemaProduct();
   const db = createDatabase({ connectionString });
 
   await migrateToLatest({
     db,
     schema,
+    product,
     onApplied: (name) => console.log(`  ✓ ${name}`),
   });
 

@@ -29,10 +29,11 @@ import {
   createCatamorphicCore,
   DeploymentRuntimeNotSupportedError,
 } from "@catamorphic/core";
-import type { DB } from "@catamorphic/db";
+import type { DB, SchemaProduct } from "@catamorphic/db";
 import {
   createDatabase,
   DEFAULT_SCHEMA,
+  DEFAULT_SCHEMA_PRODUCT,
   migrateToLatest,
 } from "@catamorphic/db";
 import type { ProjectPathResolver } from "@catamorphic/git";
@@ -127,6 +128,11 @@ export interface CatamorphicHostConfig {
   /** How often idle pollers look for work (ADR 0229); see the core option. */
   idlePollMs?: CatamorphicCoreConfig["idlePollMs"];
   database: DatabaseConfig;
+  /**
+   * Which product tables `migrate()` creates. `"core"` omits Work (`work_*`)
+   * tables (ADR 0310). Default `"all"` keeps the full schema.
+   */
+  schemaProduct?: SchemaProduct;
   storage: StorageConfig;
   /**
    * Required once the host executes runs. Read-only embedders can omit it.
@@ -346,17 +352,20 @@ export class Catamorphic {
   readonly core: CatamorphicCore;
 
   private readonly schema: string;
+  private readonly schemaProduct: SchemaProduct;
   private readonly ownsDb: boolean;
 
   constructor(config: CreateCatamorphicConfig | { core: CatamorphicCore }) {
     if ("core" in config) {
       this.core = config.core;
       this.schema = DEFAULT_SCHEMA;
+      this.schemaProduct = DEFAULT_SCHEMA_PRODUCT;
       this.ownsDb = false;
       return;
     }
     const { db, schema, ownsDb } = resolveDatabase(config.database);
     this.schema = schema;
+    this.schemaProduct = config.schemaProduct ?? DEFAULT_SCHEMA_PRODUCT;
     this.ownsDb = ownsDb;
     const contributions = mergeHostPlugins({
       plugins: config.plugins ?? [],
@@ -439,6 +448,7 @@ export class Catamorphic {
     const { applied } = await migrateToLatest({
       db: this.core.db,
       schema: this.schema,
+      product: this.schemaProduct,
     });
     return { applied };
   }

@@ -103,6 +103,9 @@ export const catamorphic = createCatamorphic({
   // Pass a pg.Pool the host already owns, or a connection string catamorphic
   // manages itself. Tables live in the `catamorphic` schema either way.
   database: { pool: hostPgPool },
+  // Omit Work (`work_*`) tables when this host does not run
+  // `@catamorphic/work-server`. Default `"all"` keeps the full schema.
+  // schemaProduct: "core",
   storage: {
     projectsPath: process.env.CATAMORPHIC_PROJECTS_PATH!,
     remotesPath: process.env.CATAMORPHIC_REMOTES_PATH!,
@@ -295,6 +298,8 @@ Install `@catamorphic/db` in the host and run migrations as a deploy step:
 DATABASE_URL=postgres://<user>:<password>@<host>:5432/<hostdb> \
 CATAMORPHIC_DB_SCHEMA=catamorphic \
 npx catamorphic-db migrate     # or: catamorphic-db status
+# Kernel-only schema (no work_* tables): CATAMORPHIC_DB_PRODUCT=core
+# or `catamorphic-db migrate --product=core`.
 ```
 
 Or programmatically:
@@ -304,6 +309,7 @@ import { createDatabase, migrateToLatest } from "@catamorphic/db";
 
 const db = createDatabase({ pool: hostPgPool });
 await migrateToLatest({ db, schema: "catamorphic" });
+// Kernel-only: await migrateToLatest({ db, schema: "catamorphic", product: "core" });
 ```
 
 For local development against a catamorphic checkout, install via `file:` links and rebuild after changes: see `.agents/skills/using-catamorphic/SKILL.md` → "Local dev linking".
@@ -974,7 +980,7 @@ retry, rate limit, batch, or child call settles inline) and `.start(input)`
 
 ## Operational Notes
 
-- `catamorphic.migrate()` / `catamorphic-db migrate` are idempotent and schema-scoped; run them in CI/deploy (preferred) or at boot.
+- `catamorphic.migrate()` / `catamorphic-db migrate` are idempotent and schema-scoped; run them in CI/deploy (preferred) or at boot. Pass `schemaProduct: "core"` / `--product=core` / `CATAMORPHIC_DB_PRODUCT=core` to omit Work (`work_*`) tables (ADR 0310). Default `"all"` keeps the full schema. A later migrate with `"all"` applies the skipped Work files.
 - Catamorphic uses strict schema scoping on its own DB access: connection strings get `search_path = "catamorphic"`, host-provided pools get Kysely's `WithSchemaPlugin`. Unqualified names cannot fall through to `public`.
 - Host-owned pools and Kysely instances are never destroyed by catamorphic; `catamorphic.close()` only closes what catamorphic created.
 - Stop handles returned by `catamorphic.startExecutionWorker(...)` during host shutdown. Constructing the SDK or Fastify plugin never starts workers implicitly.

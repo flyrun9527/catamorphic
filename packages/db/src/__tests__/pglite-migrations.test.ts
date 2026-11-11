@@ -31,7 +31,7 @@ afterAll(async () => {
 
 // PGlite is wasm: instance boot plus the full schema baseline can exceed the
 // default 5s timeout when the whole monorepo suite runs in parallel.
-const PGLITE_TIMEOUT = 60_000;
+const PGLITE_TIMEOUT = 120_000;
 
 describe("PGlite migrations", () => {
   it("refuses a plaintext secret upgrade without discarding the value", async () => {
@@ -154,6 +154,7 @@ describe("PGlite migrations", () => {
       "075_provider_retry_state.sql",
       "076_private_artifact_lifetimes.sql",
       "077_retained_source_revisions.sql",
+      "078_work_control_plane_if_missing.sql",
     ]);
 
     const rerun = await migrateToLatest({ db });
@@ -226,6 +227,134 @@ describe("PGlite migrations", () => {
       .where("id", "=", tenant.id)
       .executeTakeFirstOrThrow();
     expect(read.id).toBe(tenant.id);
+  });
+});
+
+const WORK_TABLES = [
+  "work_accounts",
+  "work_directory_announcements",
+  "work_directory_grants",
+  "work_github_app_registrations",
+  "work_machine_rules",
+  "work_project_access_requests",
+  "work_project_admission_policies",
+  "work_project_invitations",
+  "work_refresh_tokens",
+  "work_share_events",
+  "work_shares",
+  "work_token_families",
+  "work_worker_enrollments",
+  "work_workers",
+] as const;
+
+const WORK_ONLY_FILES = [
+  "021_work_host_tables.sql",
+  "022_work_company_identity.sql",
+  "025_work_shares.sql",
+  "037_work_github_app_registrations.sql",
+  "048_machine_classes_and_pools.sql",
+  "053_directory_events.sql",
+  "054_directory_announcements.sql",
+  "057_worker_rotation_order.sql",
+  "058_machine_teardown_and_rule_failures.sql",
+  "078_work_control_plane_if_missing.sql",
+] as const;
+
+const CORE_TABLES = [
+  "agent_sessions",
+  "connections",
+  "executor_keys",
+  "personal_environment_entries",
+  "projects",
+  "remote_operations",
+] as const;
+
+async function baseTableNames(schema: string) {
+  const tables = await sql<{ table_name: string }>`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = ${schema}
+      AND table_type = 'BASE TABLE'
+    ORDER BY table_name
+  `.execute(db);
+  return tables.rows.map((row) => row.table_name);
+}
+
+async function appliedMigrationNames(schema: string) {
+  const quoted = `"${schema.replaceAll('"', '""')}"`;
+  const applied = await sql<{ name: string }>`
+    SELECT name FROM ${sql.raw(`${quoted}._migrations`)} ORDER BY name
+  `.execute(db);
+  return applied.rows.map((row) => row.name);
+}
+
+describe("schema product", () => {
+  it("omits Work tables for product core and records mixed files", {
+    timeout: PGLITE_TIMEOUT,
+  }, async () => {
+    const schema = "catamorphic_core";
+    const result = await migrateToLatest({ db, schema, product: "core" });
+    expect(result.schema).toBe(schema);
+    expect(result.applied).not.toEqual([]);
+
+    const tables = await baseTableNames(schema);
+    expect(tables.filter((name) => name.startsWith("work_"))).toEqual([]);
+    expect(tables).toEqual(expect.arrayContaining([...CORE_TABLES]));
+    expect(tables).not.toContain("stock_project_access_requests");
+    expect(tables).toHaveLength(88);
+
+    const applied = await appliedMigrationNames(schema);
+    expect(applied).toEqual(
+      expect.arrayContaining([
+        "001_initial.sql",
+        "024_remote_workers.sql",
+        "027_committed_connection_bindings.sql",
+        "050_executor_keys.sql",
+      ]),
+    );
+    expect(
+      applied.filter((name) =>
+        (WORK_ONLY_FILES as readonly string[]).includes(name),
+      ),
+    ).toEqual([]);
+  });
+
+  it("creates Work tables when a core schema is later migrated with product all", {
+    timeout: PGLITE_TIMEOUT,
+  }, async () => {
+    const schema = "catamorphic_core_then_all";
+    await migrateToLatest({ db, schema, product: "core" });
+    const enabled = await migrateToLatest({ db, schema, product: "all" });
+    expect(enabled.applied).toEqual(
+      expect.arrayContaining([...WORK_ONLY_FILES]),
+    );
+
+    const tables = await baseTableNames(schema);
+    expect(tables).toEqual(
+      expect.arrayContaining([...WORK_TABLES, ...CORE_TABLES]),
+    );
+    expect(tables).not.toContain("stock_project_access_requests");
+    expect(tables).toHaveLength(102);
+
+    const columns = await sql<{ column_name: string }>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = ${schema}
+        AND table_name = 'work_accounts'
+        AND column_name = 'administrator'
+    `.execute(db);
+    expect(columns.rows).toEqual([{ column_name: "administrator" }]);
+
+    const workerColumns = await sql<{ column_name: string }>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = ${schema}
+        AND table_name = 'work_workers'
+        AND column_name = 'credential_issued_at'
+    `.execute(db);
+    expect(workerColumns.rows).toEqual([
+      { column_name: "credential_issued_at" },
+    ]);
   });
 });
 

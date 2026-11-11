@@ -86,9 +86,15 @@ three-digit number and a snake_case summary (`020_example_change.sql`).
 `001_initial.sql` is the squashed baseline. No down migrations.
 
 - Write migrations schema-agnostic: no schema prefixes. `migrateToLatest` sets
-  the target `search_path`, holds a database-wide advisory lock, and applies all
+  the target `search_path`, holds a database-wide advisory lock, and applies
   pending files in one transaction. It records each file by name in
-  `<schema>._migrations`.
+  `<schema>._migrations`. Pass `product: "core"` to omit Work tables
+  ([ADR 0310](../../../docs/decisions/0310-schema-product-core-omits-work.md)).
+  Work-only files start with `-- @catamorphic-product work` and are skipped
+  without recording so a later `"all"` migrate still applies them. Mixed files
+  wrap Work statements in `-- @catamorphic-product-begin work` /
+  `-- @catamorphic-product-end`; the core remainder is recorded. Untagged SQL
+  is core. Default `product` is `"all"`.
 - They must run on PGlite: statements are split one at a time, and only the
   `pgcrypto` extension is loaded.
 - The project is greenfield. Rename, drop, and backfill in place, with no
@@ -98,7 +104,9 @@ three-digit number and a snake_case summary (`020_example_change.sql`).
   only in your unmerged branch may be rewritten in place.
 
 Migrations run on boot (`catamorphic.migrate()` or `migrateToLatest`) and
-through the `catamorphic-db` CLI (`migrate`, `status`, `reset`).
+through the `catamorphic-db` CLI (`migrate`, `status`, `reset`). CLI product:
+`CATAMORPHIC_DB_PRODUCT=core` or `--product=core`. SDK:
+`createCatamorphic({ schemaProduct: "core" })`.
 
 ## Changing the schema
 

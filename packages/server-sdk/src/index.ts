@@ -163,8 +163,12 @@ export {
   WorkerNodesService,
   webhookConfig,
 } from "@catamorphic/core";
-export type { DB } from "@catamorphic/db";
-export { createDatabase, migrateToLatest } from "@catamorphic/db";
+export type { DB, SchemaProduct } from "@catamorphic/db";
+export {
+  createDatabase,
+  DEFAULT_SCHEMA_PRODUCT,
+  migrateToLatest,
+} from "@catamorphic/db";
 export type { ProjectPathResolver } from "@catamorphic/git";
 export {
   FsBackend,

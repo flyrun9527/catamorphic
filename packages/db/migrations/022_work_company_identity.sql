@@ -1,3 +1,4 @@
+-- @catamorphic-product work
 -- Company identity (ADR 0161): account lifecycle, rotating refresh token
 -- families, and directory groups mapped to project roles.
 

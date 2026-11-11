@@ -1,3 +1,4 @@
+-- @catamorphic-product work
 -- GitHub App registrations from a manifest in progress (ADR 0177). The
 -- one-time link's state is the bearer, stored only as its hash, so any
 -- replica continues a registration. Between GitHub creating the App and the

@@ -1,3 +1,4 @@
+-- @catamorphic-product work
 -- Shares (ADR 0165): a document, folder, or app addressed to named people or
 -- email domains outside the project. Viewers sign in; nothing is public.
 CREATE TABLE work_shares (

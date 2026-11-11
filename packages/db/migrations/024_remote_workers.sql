@@ -16,6 +16,7 @@ CREATE TABLE worker_node_jobs (
 
 CREATE INDEX idx_worker_node_jobs_pending ON worker_node_jobs USING btree (node_id, created_at) WHERE (status = 'pending'::text);
 
+-- @catamorphic-product-begin work
 -- The Work server's enrolled workers: a name, a hashed machine credential,
 -- liveness, and placement policy (ADR 0167): labels Environments select on,
 -- whose work the worker takes (`{"everyone": true}` or
@@ -72,3 +73,4 @@ CREATE TABLE work_machine_reconciler (
     holder text NOT NULL,
     expires_at timestamp with time zone NOT NULL
 );
+-- @catamorphic-product-end

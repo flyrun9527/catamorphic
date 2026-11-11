@@ -1,3 +1,4 @@
+-- @catamorphic-product work
 -- Directory events start workflows (ADR 0210): an account's transitions
 -- (joined, left, groups changed) are recorded with it, so each is announced
 -- once, in the transaction that records it.

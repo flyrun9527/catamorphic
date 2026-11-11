@@ -13,6 +13,15 @@ export type {
 } from "./migrate.js";
 export { migrateToLatest } from "./migrate.js";
 export { getMigrationsDir } from "./migrations-dir.js";
+export type { MigrationProduct, SchemaProduct } from "./schema-product.js";
+export {
+  DEFAULT_SCHEMA_PRODUCT,
+  fileSchemaProduct,
+  parseSchemaProduct,
+  resolveSchemaProduct,
+  shouldApplyMigrationFile,
+  sqlForSchemaProduct,
+} from "./schema-product.js";
 export {
   jsonbText,
   storableText,

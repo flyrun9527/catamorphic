@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { sql } from "kysely";
 import {
   quoteIdentifier,
@@ -7,10 +8,15 @@ import {
 } from "./config.js";
 import { createDatabase } from "./database.js";
 import { getMigrationsDir } from "./migrations-dir.js";
+import {
+  resolveSchemaProduct,
+  shouldApplyMigrationFile,
+} from "./schema-product.js";
 
 export async function runStatus() {
   const connectionString = resolveDatabaseUrl();
   const schema = resolveSchema();
+  const product = resolveSchemaProduct();
   const quotedSchema = quoteIdentifier(schema);
   const migrationsTable = `${quotedSchema}._migrations`;
   const db = createDatabase({ connectionString });
@@ -37,8 +43,13 @@ export async function runStatus() {
   `.execute(db);
   const appliedSet = new Set(applied.rows.map((row) => row.name));
 
-  const pending = files.filter((file) => !appliedSet.has(file));
+  const pending = files.filter((file) => {
+    if (appliedSet.has(file)) return false;
+    const content = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
+    return shouldApplyMigrationFile(content, product);
+  });
   console.log(`Schema: ${schema}`);
+  console.log(`Product: ${product}`);
   console.log(`Applied: ${applied.rows.length}`);
   console.log(`Pending: ${pending.length}`);
   for (const file of pending) {

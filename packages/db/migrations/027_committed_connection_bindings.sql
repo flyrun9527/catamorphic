@@ -46,6 +46,8 @@ ALTER TABLE connection_authorization_attempts ADD CONSTRAINT chk_connection_atte
     OR (project_id IS NOT NULL AND environment_name IS NOT NULL AND alias IS NOT NULL)
   );
 
+-- @catamorphic-product-begin work
 -- Work server organization administrators (ADR 0172): hold the host-issued
 -- connections permissions. Project roles never grant them.
 ALTER TABLE work_accounts ADD COLUMN administrator boolean DEFAULT false NOT NULL;
+-- @catamorphic-product-end

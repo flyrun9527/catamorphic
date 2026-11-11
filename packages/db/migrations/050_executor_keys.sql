@@ -15,6 +15,7 @@ CREATE TABLE executor_keys (
 -- controllers already fail them as uncertain.
 DELETE FROM remote_operations;
 
+-- @catamorphic-product-begin work
 -- Worker credentials rotate (ADR 0207). `credential_issued_at` dates the
 -- current credential. A rotation leaves the new credential pending, with the
 -- public key the worker generated beside it, while the current one keeps
@@ -32,3 +33,4 @@ ALTER TABLE work_workers
     ADD COLUMN rotation_requested_at timestamp with time zone;
 
 UPDATE work_workers SET credential_issued_at = enrolled_at;
+-- @catamorphic-product-end
